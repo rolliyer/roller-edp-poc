@@ -4,3 +4,5 @@ composer/
 sales_analytics/logs/
 sales_analytics/y/
 sales_analytics/target/
+.DS_Store
+*.pyc

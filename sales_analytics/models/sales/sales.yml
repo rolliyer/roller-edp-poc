@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: sales
+    description: "Sales table built from CSV seed data"
+    columns:
+      - name: order_id
+        description: "Unique identifier for each order"
+        tests:
+          - unique
+          - not_null
+      - name: order_date
+        description: "Date when the order was placed"
+      - name: net_amount
+        description: "Total revenue after discount"

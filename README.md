@@ -11,3 +11,9 @@ In the main setup the profiles dir
 `source ~/.zshrc`
 
 #### Credentials saved to file: [/Users/siyer/.config/gcloud/application_default_credentials.json]
+
+
+I need to write all the steps here so that I don't forget 
+
+
+`docker compose down --volumes --remove-orphans`
