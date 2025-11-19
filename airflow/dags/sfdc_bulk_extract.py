@@ -4,11 +4,17 @@ import pendulum
 
 from airflow.models.dag import DAG
 from airflow.providers.http.operators.http import HttpOperator
+from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import PythonOperator
+from data_loader import load_jsonl_gz_to_bigquery
+
+from google.cloud import storage
+from google.cloud import bigquery
 
 # --- Configuration Variables ---
 API_BASE_URL = "https://apim.workato.com"  # Base URL configured in HTTP connection
 API_ENDPOINT = "/roller/sfdc-bulk-extract-v1/extractRecords"
-API_TOKEN_CONN_ID = "6a79b4d6c1ed4ec0a578823c9e386ee166bb78eae09b5ed947ef3471d1841d0f" # Connection ID storing the API Token
+API_TOKEN_CONN_ID = "" # Connection ID storing the API Token
 
 # --- Define the Request Body (Payload) ---
 # This payload triggers your Workato bulk extract recipe
@@ -45,6 +51,10 @@ with DAG(
     catchup=False,
     tags=["http", "workato", "etl"],
 ) as dag:
+    
+    start_task = EmptyOperator(task_id='start')
+    end_task = EmptyOperator(task_id='end')
+
     # --- 3. The HttpOperator Task ---
     account_extract = HttpOperator(
         task_id="account_extract",
@@ -166,4 +176,31 @@ with DAG(
         response_filter=lambda response: print(response.text)
     )
 
-    account_extract >> lead_extract >> opportunity_extract >> contact_extract >> user_extract
+    required_columns = [
+    "Id",
+    "Name",
+    "Industry",
+    "createdDate"
+    ]
+
+    bq_schema = [
+        bigquery.SchemaField("Id", "STRING"),
+        bigquery.SchemaField("Name", "STRING"),
+        bigquery.SchemaField("Industry", "STRING"),
+        bigquery.SchemaField("createdDate", "TIMESTAMP")
+    ]
+
+    load_account = PythonOperator(
+            task_id='load_account_bq',
+            python_callable=load_jsonl_gz_to_bigquery,
+            op_kwargs={ "gcs_bucket": "raw_edp_salesforce",
+                        "gcs_blob_path": "source=salesforce/object_type=Account/year=2025/month=11/day=19/hour=11/214062_20251119T114908Z.jsonl.gz",
+                        "project_id": "ent-data-warehouse-dev",
+                        "dataset_id": "edp_bronze",
+                        "table_id": "python_account",
+                        "required_columns": required_columns,
+                        "bq_schema": bq_schema
+                    }
+        )
+
+    start_task >> account_extract >> load_account >> lead_extract >> opportunity_extract >> contact_extract >> user_extract >> end_task
